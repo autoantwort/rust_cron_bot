@@ -1,0 +1,16 @@
+[package]
+name = "rust_cron_bot"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tbot = "0.6.4"
+tokio = { version = "0.2.21", features = ["rt-threaded", "macros"] }
+tracing = { version = "0.1.15", features = ["release_max_level_info"] }
+tracing-subscriber = "0.2.6"
+anyhow = "1.0.31"
+rand = "0.7.3"
+diesel = { version = "1.4.0", features = ["sqlite", "numeric", "r2d2"] }
+dotenv = "0.10"

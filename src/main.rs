@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Context, Result};
+use bb8_diesel::{DieselConnection, DieselConnectionManager};
 use rand::{seq::SliceRandom, thread_rng};
 use std::sync::Arc;
 use tbot::{
@@ -17,7 +18,7 @@ extern crate dotenv;
 
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
-use diesel::r2d2::{ConnectionManager, Pool};
+use bb8::{Builder, Pool};
 use dotenv::dotenv;
 use std::env;
 
@@ -28,10 +29,13 @@ pub mod schema;
 // use self::diesel_demo::*;
 use self::models::*;
 
-pub fn establish_connection() -> Pool<ConnectionManager<SqliteConnection>> {    
+
+pub async fn establish_connection() -> Pool<DieselConnectionManager<SqliteConnection>> {    
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let manager = ConnectionManager::<SqliteConnection>::new(database_url);
-    Pool::builder().build(manager).expect("Failed to create Pool for Database connections")
+
+    let manager = bb8_diesel::DieselConnectionManager::<SqliteConnection>::new(database_url);
+    let pool = bb8::Pool::builder().build(manager).await.unwrap();
+    pool
 }
 
 pub fn create_entry(
@@ -60,7 +64,7 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     dotenv().ok();
 
-    let connection_pool = establish_connection();
+    let connection_pool = establish_connection().await;
 
     let mut bot_loop = Bot::new(env::var("BOT_TOKEN").expect("BOT_TOKEN must be set")).event_loop();
 
@@ -73,12 +77,11 @@ async fn main() -> Result<()> {
     bot_loop.command(
         "add",
         |context: Arc<tbot::contexts::Command<tbot::contexts::Text>>| async move {
-            handle_add(&context, &connection_pool.get().expect("Failed to sqlite connection")).await.unwrap_or_else(|e| {
+            handle_add(&context, connection_pool).await.unwrap_or_else(|e| {
                 error!("add handled unsuccessfully: {}", e);
             });
         },
     );
-
     bot_loop
         .polling()
         .start()
@@ -90,10 +93,10 @@ async fn main() -> Result<()> {
 
 async fn handle_add(
     ctx: &tbot::contexts::Command<tbot::contexts::Text>,
-    conn: &SqliteConnection,
+    connection_pool: Pool<DieselConnectionManager<SqliteConnection>>,
 ) -> Result<()> {
     println!("Nachricht {} form {}", ctx.text.value, ctx.message_id);
-    create_entry(conn, ctx.chat.id.0, ctx.message_id.0 as i64, ctx.text.value.as_str(), ctx.text.value.as_str());
+    create_entry(&connection_pool.get().await.expect("Failed to sqlite connection"), ctx.chat.id.0, ctx.message_id.0 as i64, ctx.text.value.as_str(), ctx.text.value.as_str());
     ctx.send_message_in_reply(
         "Guter Wurf! Aber jetzt genug geübt, probier dein Glück in der Hauptgruppe!",
     )

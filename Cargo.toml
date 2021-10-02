@@ -14,3 +14,5 @@ anyhow = "1.0.31"
 rand = "0.7.3"
 diesel = { version = "1.4.0", features = ["sqlite", "numeric", "r2d2"] }
 dotenv = "0.10"
+bb8 = "0.7.1"
+bb8-diesel = "0.2.1"
